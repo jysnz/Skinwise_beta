@@ -1,11 +1,9 @@
 services:
   - type: web
-    name: skinwise-api
+    name: skin-disease-ai
     env: python
-    region: oregon  # or any preferred region
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn main:app -k uvicorn.workers.UvicornWorker --workers 1 --timeout 120 --bind 0.0.0.0:10000
     envVars:
       - key: OPENAI_API_KEY
-        sync: false
-    plan: starter
+        sync: false  # Make sure to add it manually in the Render dashboard
