@@ -16,7 +16,7 @@ app = FastAPI()
 # === Load Keras Model ===
 MODEL_FILE = "mobilenetv2_skin_disease_model.h5"
 model = tf.keras.models.load_model(MODEL_FILE)
-class_labels = ['label1', 'label2', 'label3', '...']  # Replace with your actual class names
+class_labels = ['Acne', 'Athlete's Foot', 'Cellulitis', 'Chickenpox', 'Cutaneous Larva Migrans', 'Impetigo', 'Nail-Fungus', 'Normal', 'Ringworm', 'Shingles']  # Replace with your actual class names
 IMG_SIZE = 224
 
 # === Initialize OpenAI ===
@@ -55,7 +55,7 @@ def getDescription(diseaseName: str) -> str:
             model="deepseek-chat",
             messages=[{
                 "role": "user",
-                "content": f"Give me a description about this {diseaseName}. Only the description. Don't include special characters and dont ask questions at the end"
+                "content": f"Give me a description about this {diseaseName}. Only the description. Don't include special characters and don't ask questions at the end"
             }],
             temperature=0.7,
             max_tokens=500,
