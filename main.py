@@ -16,7 +16,7 @@ app = FastAPI()
 # === Load Keras Model ===
 MODEL_FILE = "mobilenetv2_skin_disease_model.h5"
 model = tf.keras.models.load_model(MODEL_FILE)
-class_labels = ['Acne', 'Athlete's Foot', 'Cellulitis', 'Chickenpox', 'Cutaneous Larva Migrans', 'Impetigo', 'Nail-Fungus', 'Normal', 'Ringworm', 'Shingles']  # Replace with your actual class names
+class_labels = ['Acne', 'Athlete\'s Foot', 'Cellulitis', 'Chickenpox', 'Cutaneous Larva Migrans', 'Impetigo', 'Nail-Fungus', 'Normal', 'Ringworm', 'Shingles']  # Replace with your actual class names
 IMG_SIZE = 224
 
 # === Initialize OpenAI ===
