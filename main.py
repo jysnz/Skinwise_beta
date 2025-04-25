@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.responses import JSONResponse
 import os
 import numpy as np
@@ -26,20 +26,6 @@ CLASS_LABELS = [
 ]
 
 model = None
-
-# === Load Model Once ===
-@app.on_event("startup")
-async def load_model():
-    global model
-    try:
-        print(f"📁 Looking for model at: {MODEL_FILE}")
-        if os.path.exists(MODEL_FILE):
-            model = tf.keras.models.load_model(MODEL_FILE)
-            print("✅ Model loaded successfully")
-        else:
-            print(f"❌ Model file '{MODEL_FILE}' not found!")
-    except Exception as e:
-        print(f"❌ Failed to load model: {e}")
 
 # === Initialize OpenAI ===
 ai_client = OpenAI(
@@ -108,16 +94,26 @@ def getRemedy(disease: str) -> str:
         print(f"[Unexpected Remedy Error] {e}")
         return "Error: An unexpected error occurred."
 
-# === Check Model Loading ===
-@app.get("/check-model")
-async def check_model():
-    if model is None:
-        return {"status": "❌ Model not loaded"}
-    return {"status": "✅ Model is loaded"}
+# === Load Model in Background ===
+def load_model():
+    global model
+    try:
+        model = tf.keras.models.load_model(MODEL_FILE)
+        print("✅ Model loaded successfully")
+    except Exception as e:
+        print(f"❌ Failed to load model: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    loop = asyncio.get_event_loop()
+    loop.run_in_executor(None, load_model)
 
 # === Main Prediction Route ===
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
+    if model is None:
+        return JSONResponse(content={"error": "Model is not loaded yet. Please try again later."}, status_code=503)
+
     try:
         image_bytes = await file.read()
 
