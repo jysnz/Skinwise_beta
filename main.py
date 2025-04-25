@@ -8,7 +8,6 @@ import cv2
 from io import BytesIO
 from openai import OpenAI, APIError, AuthenticationError
 from PIL import Image
-import logging
 
 # Silence TensorFlow logs
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
@@ -91,7 +90,7 @@ def getRemedy(disease: str) -> str:
             model="deepseek-chat",
             messages=[{
                 "role": "user",
-                "content": f"Give me the best non medical remedies about {disease}. Only the remedy and how they use it. Don't include special characters except for numbers, Add point special character for numbers. Don't add any drug medication only the non-medical. And, dont ask questions at the end. Only include 10 non medical remedies."
+                "content": f"Give me the best non medical remedies about {disease}. Only the remedy and how they use it. Don't include special characters except for numbers, Add point special character for numbers. Don't add any drug medication only the non-medical. And, don't ask questions at the end. Only include 10 non medical remedies."
             }],
             temperature=0.7,
             max_tokens=500,
@@ -110,18 +109,25 @@ async def upload(file: UploadFile = File(...)):
     try:
         image_bytes = await file.read()
 
-        if not await asyncio.to_thread(is_valid_skin_image, image_bytes):
-            return JSONResponse(content={"result": "Please capture an image of the affected skin area."})
+        is_valid = await asyncio.to_thread(is_valid_skin_image, image_bytes)
+        if not is_valid:
+            return JSONResponse(
+                content={"result": "Please capture an image of the affected skin area."},
+                status_code=400
+            )
 
         img_array = await asyncio.to_thread(preprocess_image, image_bytes)
-
         predictions = await asyncio.to_thread(model.predict, img_array)
+
         top_idx = int(np.argmax(predictions[0]))
         confidence = float(predictions[0][top_idx])
         disease = CLASS_LABELS[top_idx]
 
         if confidence < 0.65:
-            return JSONResponse(content={"result": "Skin disease not covered", "confidence": round(confidence, 4)})
+            return JSONResponse(content={
+                "result": "Skin disease not covered",
+                "confidence": round(confidence, 4)
+            })
 
         description, remedies = await asyncio.gather(
             asyncio.to_thread(getDescription, disease),
@@ -137,4 +143,7 @@ async def upload(file: UploadFile = File(...)):
 
     except Exception as e:
         print(f"[Prediction Error] {e}")
-        return JSONResponse(content={"error": f"Prediction failed: {e}"}, status_code=500)
+        return JSONResponse(
+            content={"error": f"Prediction failed: {str(e)}"},
+            status_code=500
+        )
