@@ -22,7 +22,7 @@ IMG_SIZE = 224
 # === Initialize OpenAI ===
 ai_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url="https://api.deepseek.com"
+    base_url='https://api.deepseek.com'
 )
 
 # === Utility Functions ===
