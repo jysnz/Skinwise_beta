@@ -1,9 +1,15 @@
-fastapi
-uvicorn
-gunicorn
-python-multipart
-numpy
-pillow
-opencv-python-headless
-tensorflow
-openai
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+gunicorn==21.2.0
+python-multipart==0.0.9
+
+# Image and array processing
+numpy==1.24.4
+pillow==10.2.0
+opencv-python-headless==4.9.0.80
+
+# Machine Learning
+tensorflow==2.15.0  # Match the version used to train and save model.keras
+
+# OpenAI / DeepSeek SDK
+openai==1.16.2
