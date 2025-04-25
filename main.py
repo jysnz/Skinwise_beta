@@ -17,7 +17,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 app = FastAPI()
 
 # === Constants ===
-MODEL_FILE = "mobilenetv2_skin_disease_model.h5"
+MODEL_FILE = "skin_disease_model.keras"
 IMG_SIZE = 224
 CLASS_LABELS = [
     'Acne', "Athlete's Foot", 'Cellulitis', 'Chickenpox',
@@ -40,7 +40,7 @@ async def load_model():
 # === Initialize OpenAI ===
 ai_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url='https://api.deepseek.com'
+    base_url="https://api.deepseek.com"
 )
 
 # === Utility Functions ===
