@@ -3,7 +3,7 @@ services:
     name: skin-disease-ai
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn main:app -k uvicorn.workers.UvicornWorker --workers 2 --timeout 90 --bind 0.0.0.0:10000
+    startCommand: gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:10000
     envVars:
       - key: OPENAI_API_KEY
         sync: false  # Make sure to add it manually in the Render dashboard
