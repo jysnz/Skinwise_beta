@@ -8,6 +8,10 @@ import cv2
 from io import BytesIO
 from openai import OpenAI, APIError, AuthenticationError
 from PIL import Image
+import logging
+
+# Silence TensorFlow logs
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # === Initialize FastAPI ===
 app = FastAPI()
@@ -16,18 +20,22 @@ app = FastAPI()
 MODEL_FILE = "mobilenetv2_skin_disease_model.h5"
 IMG_SIZE = 224
 CLASS_LABELS = [
-    'Acne', 'Athlete\'s Foot', 'Cellulitis', 'Chickenpox',
+    'Acne', "Athlete's Foot", 'Cellulitis', 'Chickenpox',
     'Cutaneous Larva Migrans', 'Impetigo', 'Nail-Fungus',
     'Normal', 'Ringworm', 'Shingles'
 ]
 
-# === Load Model Once ===
 model = None
+
+# === Load Model Once ===
 @app.on_event("startup")
 async def load_model():
     global model
-    model = tf.keras.models.load_model(MODEL_FILE)
-    print("✅ Model loaded successfully")
+    try:
+        model = tf.keras.models.load_model(MODEL_FILE)
+        print("✅ Model loaded successfully")
+    except Exception as e:
+        print(f"❌ Failed to load model: {e}")
 
 # === Initialize OpenAI ===
 ai_client = OpenAI(
@@ -115,7 +123,6 @@ async def upload(file: UploadFile = File(...)):
         if confidence < 0.65:
             return JSONResponse(content={"result": "Skin disease not covered", "confidence": round(confidence, 4)})
 
-        # Run both in parallel (non-blocking)
         description, remedies = await asyncio.gather(
             asyncio.to_thread(getDescription, disease),
             asyncio.to_thread(getRemedy, disease)
