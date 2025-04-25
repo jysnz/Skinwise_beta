@@ -12,16 +12,27 @@ from PIL import Image
 # === Initialize FastAPI ===
 app = FastAPI()
 
-# === Load Keras Model ===
+# === Constants ===
 MODEL_FILE = "mobilenetv2_skin_disease_model.h5"
-model = tf.keras.models.load_model(MODEL_FILE)
-class_labels = ['Acne', 'Athlete\'s Foot', 'Cellulitis', 'Chickenpox', 'Cutaneous Larva Migrans', 'Impetigo', 'Nail-Fungus', 'Normal', 'Ringworm', 'Shingles']  # Replace with your actual class names
 IMG_SIZE = 224
+CLASS_LABELS = [
+    'Acne', 'Athlete\'s Foot', 'Cellulitis', 'Chickenpox',
+    'Cutaneous Larva Migrans', 'Impetigo', 'Nail-Fungus',
+    'Normal', 'Ringworm', 'Shingles'
+]
+
+# === Load Model Once ===
+model = None
+@app.on_event("startup")
+async def load_model():
+    global model
+    model = tf.keras.models.load_model(MODEL_FILE)
+    print("✅ Model loaded successfully")
 
 # === Initialize OpenAI ===
 ai_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url='https://api.deepseek.com'  # Ensure no extra characters
+    base_url='https://api.deepseek.com'
 )
 
 # === Utility Functions ===
@@ -38,91 +49,85 @@ def is_valid_skin_image(image_bytes: bytes) -> bool:
         skin_ratio = np.sum(skin_mask > 0) / skin_mask.size
         return skin_ratio > 0.2
     except Exception as e:
-        print(f"Image validity check failed: {e}")
+        print(f"[Image Check Error] {e}")
         return False
 
 def preprocess_image(image_bytes: bytes) -> np.ndarray:
     img = Image.open(BytesIO(image_bytes)).convert("RGB")
     img = img.resize((IMG_SIZE, IMG_SIZE))
-    img_array = np.array(img) / 255.0  # Normalize
-    img_array = np.expand_dims(img_array, axis=0)  # Add batch dimension
-    return img_array
+    img_array = np.array(img) / 255.0
+    return np.expand_dims(img_array, axis=0)
 
-def getDescription(diseaseName: str) -> str:
+def getDescription(disease: str) -> str:
     try:
         response = ai_client.chat.completions.create(
             model="deepseek-chat",
             messages=[{
                 "role": "user",
-                "content": f"Give me a description about this {diseaseName}. Only the description. Don't include special characters and don't ask questions at the end"
+                "content": f"Give me a description about this {disease}. Only the description. Don't include special characters and don't ask questions at the end"
             }],
             temperature=0.7,
             max_tokens=500,
         )
         return response.choices[0].message.content
     except (AuthenticationError, APIError) as e:
-        print(f"API error occurred: {e}")
+        print(f"[OpenAI Description Error] {e}")
         return "Error: Unable to fetch description."
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"[Unexpected Description Error] {e}")
         return "Error: An unexpected error occurred."
 
-def getRemedy(diseaseName: str) -> str:
+def getRemedy(disease: str) -> str:
     try:
         response = ai_client.chat.completions.create(
             model="deepseek-chat",
             messages=[{
                 "role": "user",
-                "content": f"Give me the best non medical remedies about {diseaseName}. Only the remedy and how they use it. Don't include special characters except for numbers, Add point special character for numbers. Don't add any drug medication only the non-medical. And, dont ask questions at the end. Only include 10 non medical remedies."
+                "content": f"Give me the best non medical remedies about {disease}. Only the remedy and how they use it. Don't include special characters except for numbers, Add point special character for numbers. Don't add any drug medication only the non-medical. And, dont ask questions at the end. Only include 10 non medical remedies."
             }],
             temperature=0.7,
             max_tokens=500,
         )
         return response.choices[0].message.content
     except (AuthenticationError, APIError) as e:
-        print(f"API error occurred: {e}")
+        print(f"[OpenAI Remedy Error] {e}")
         return "Error: Unable to fetch remedies."
     except Exception as e:
-        print(f"Unexpected error: {e}")
+        print(f"[Unexpected Remedy Error] {e}")
         return "Error: An unexpected error occurred."
 
-# === Routes ===
+# === Main Prediction Route ===
 @app.post("/upload")
 async def upload(file: UploadFile = File(...)):
     try:
-        original_image_bytes = await file.read()
+        image_bytes = await file.read()
 
-        # Validate image
-        if not await asyncio.to_thread(is_valid_skin_image, original_image_bytes):
-            return JSONResponse(content={"result": "Please capture an image of the affected skin area."}, status_code=200)
+        if not await asyncio.to_thread(is_valid_skin_image, image_bytes):
+            return JSONResponse(content={"result": "Please capture an image of the affected skin area."})
 
-        # Preprocess image for model input
-        img_array = await asyncio.to_thread(preprocess_image, original_image_bytes)
+        img_array = await asyncio.to_thread(preprocess_image, image_bytes)
 
-        # Predict
-        predictions = model.predict(img_array)[0]
-        top_index = np.argmax (predictions)
-        confidence = float(predictions[top_index])
-        predicted_disease = class_labels[top_index]
+        predictions = await asyncio.to_thread(model.predict, img_array)
+        top_idx = int(np.argmax(predictions[0]))
+        confidence = float(predictions[0][top_idx])
+        disease = CLASS_LABELS[top_idx]
 
         if confidence < 0.65:
-            return JSONResponse(content={
-                "result": "Skin disease not covered",
-                "confidence": round(confidence, 4)
-            }, status_code=200)
+            return JSONResponse(content={"result": "Skin disease not covered", "confidence": round(confidence, 4)})
 
-        # Fetch description and remedies in parallel
+        # Run both in parallel (non-blocking)
         description, remedies = await asyncio.gather(
-            asyncio.to_thread(getDescription, predicted_disease),
-            asyncio.to_thread(getRemedy, predicted_disease)
+            asyncio.to_thread(getDescription, disease),
+            asyncio.to_thread(getRemedy, disease)
         )
 
         return JSONResponse(content={
-            "result": predicted_disease,
+            "result": disease,
             "confidence": round(confidence, 4),
-            "description": description or "No description available",
-            "remedies": remedies or "No remedies available"
+            "description": description,
+            "remedies": remedies
         })
 
     except Exception as e:
+        print(f"[Prediction Error] {e}")
         return JSONResponse(content={"error": f"Prediction failed: {e}"}, status_code=500)
