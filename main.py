@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 import os
 import numpy as np
 import tensorflow as tf
-import uuid
 import asyncio
 import cv2
 from io import BytesIO
@@ -22,7 +21,7 @@ IMG_SIZE = 224
 # === Initialize OpenAI ===
 ai_client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url='https://api.deepseek.com'
+    base_url='https://api.deepseek.com'  # Ensure no extra characters
 )
 
 # === Utility Functions ===
@@ -61,8 +60,12 @@ def getDescription(diseaseName: str) -> str:
             max_tokens=500,
         )
         return response.choices[0].message.content
-    except (AuthenticationError, APIError, Exception) as e:
-        return f"Error: {e}"
+    except (AuthenticationError, APIError) as e:
+        print(f"API error occurred: {e}")
+        return "Error: Unable to fetch description."
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return "Error: An unexpected error occurred."
 
 def getRemedy(diseaseName: str) -> str:
     try:
@@ -76,8 +79,12 @@ def getRemedy(diseaseName: str) -> str:
             max_tokens=500,
         )
         return response.choices[0].message.content
-    except (AuthenticationError, APIError, Exception) as e:
-        return f"Error: {e}"
+    except (AuthenticationError, APIError) as e:
+        print(f"API error occurred: {e}")
+        return "Error: Unable to fetch remedies."
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return "Error: An unexpected error occurred."
 
 # === Routes ===
 @app.post("/upload")
@@ -94,7 +101,7 @@ async def upload(file: UploadFile = File(...)):
 
         # Predict
         predictions = model.predict(img_array)[0]
-        top_index = np.argmax(predictions)
+        top_index = np.argmax (predictions)
         confidence = float(predictions[top_index])
         predicted_disease = class_labels[top_index]
 
